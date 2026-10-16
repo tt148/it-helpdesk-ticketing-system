@@ -6,7 +6,7 @@ class CategorySerializer(serializers.ModelSerializer):
     class Meta: model = Category; fields = ["id", "name", "slug", "description"]
 class CommentSerializer(serializers.ModelSerializer):
     author_email = serializers.EmailField(source="author.email", read_only=True)
-    class Meta: model = Comment; fields = ["id", "ticket", "author", "author_email", "body", "is_internal", "created_at"]; read_only_fields = ["author", "created_at"]
+    class Meta: model = Comment; fields = ["id", "ticket", "author", "author_email", "body", "is_internal", "created_at"]; read_only_fields = ["ticket", "author", "created_at"]
     def validate_is_internal(self, value):
         if value and self.context["request"].user.role == "employee": raise serializers.ValidationError("Employees cannot create internal notes.")
         return value

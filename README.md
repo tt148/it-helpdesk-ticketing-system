@@ -84,7 +84,8 @@ Stop with `docker compose down`; retain database data with the named volume. `do
 
 ```bash
 python manage.py check
-python manage.py makemigrations --check --dry-run
+python manage.py makemigrations accounts tickets kb
+python manage.py migrate
 ruff check .
 pytest
 ```
