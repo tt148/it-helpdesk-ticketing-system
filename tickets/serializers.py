@@ -23,6 +23,15 @@ class TicketSerializer(serializers.ModelSerializer):
         qs = obj.comments.select_related("author")
         if self.context["request"].user.role == "employee": qs = qs.filter(is_internal=False)
         return CommentSerializer(qs, many=True, context=self.context).data
+    def validate(self, attrs):
+        user = self.context["request"].user
+        if user.role == "employee":
+            forbidden = set(attrs) - {"title", "description", "category", "priority"}
+            if forbidden:
+                raise serializers.ValidationError("Employees may edit only the title, description, category, and priority of their own open tickets.")
+            if self.instance and self.instance.status != "open":
+                raise serializers.ValidationError("Employees may edit only tickets that are still open.")
+        return attrs
     def validate_assignee(self, value):
         if value and value.role not in {"technician", "admin"}: raise serializers.ValidationError("Tickets can only be assigned to technicians or admins.")
         return value

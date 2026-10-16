@@ -19,9 +19,8 @@ services:
           property: connectionString
       - key: EMAIL_BACKEND
         value: django.core.mail.backends.console.EmailBackend
-  - type: pserv
-    name: helpdesk-pro-db
-    runtime: postgres
-    plan: free
+databases:
+  - name: helpdesk-pro-db
     databaseName: helpdesk
     user: helpdesk
+    plan: free
