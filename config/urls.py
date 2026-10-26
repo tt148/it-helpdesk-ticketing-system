@@ -10,10 +10,14 @@ router = DefaultRouter()
 router.register("tickets", TicketViewSet, basename="api-ticket")
 router.register("categories", CategoryViewSet, basename="api-category")
 urlpatterns = [
-    path("admin/", admin.site.urls), path("accounts/", include("django.contrib.auth.urls")),
-    path("users/", include("accounts.urls")), path("tickets/", include("tickets.urls")),
-    path("kb/", include("kb.urls")), path("", include("dashboard.urls")),
-    path("api/", include(router.urls)), path("api/token/", obtain_auth_token, name="api-token"),
+    path("admin/", admin.site.urls),
+    path("accounts/", include("django.contrib.auth.urls")),
+    path("users/", include("accounts.urls")),
+    path("tickets/", include("tickets.urls")),
+    path("kb/", include("kb.urls")),
+    path("", include("dashboard.urls")),
+    path("api/", include(router.urls)),
+    path("api/token/", obtain_auth_token, name="api-token"),
     path("api/schema/", SpectacularAPIView.as_view(), name="schema"),
     path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
     path("api/redoc/", SpectacularRedocView.as_view(url_name="schema"), name="redoc"),
