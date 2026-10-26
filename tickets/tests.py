@@ -1,4 +1,6 @@
+import csv
 from datetime import timedelta
+from io import StringIO
 
 import pytest
 from django.contrib.auth import get_user_model
@@ -59,6 +61,105 @@ def test_employee_cannot_read_another_ticket(users, category, ticket):
     client = APIClient()
     client.force_authenticate(users["employee"])
     assert client.get(f"/api/tickets/{other_ticket.pk}/").status_code == 404
+
+
+def test_employee_cannot_edit_another_employees_ticket(users, category):
+    other_employee = User.objects.create_user(
+        username="other-employee",
+        email="other-employee@example.com",
+        password="GoodPass123!",
+        role="employee",
+    )
+    other_ticket = Ticket.objects.create(
+        title="Other employee ticket",
+        description="Private",
+        category=category,
+        requester=other_employee,
+    )
+    client = APIClient()
+    client.force_authenticate(users["employee"])
+
+    response = client.patch(
+        f"/api/tickets/{other_ticket.pk}/",
+        {"title": "Changed by another employee"},
+        format="json",
+    )
+
+    assert response.status_code == 404
+    other_ticket.refresh_from_db()
+    assert other_ticket.title == "Other employee ticket"
+
+
+@pytest.mark.parametrize("role", ["employee"])
+def test_employee_cannot_access_csv_export(client, users, role):
+    client.force_login(users[role])
+
+    assert client.get("/tickets/reports/export.csv").status_code == 403
+
+
+@pytest.mark.parametrize("role", ["technician", "admin"])
+def test_staff_can_export_csv_with_headers_and_ticket_rows(client, users, category, role):
+    ticket = Ticket.objects.create(
+        title="CSV export ticket",
+        description="Export row",
+        category=category,
+        requester=users["employee"],
+        assignee=users["technician"],
+        priority="critical",
+    )
+    client.force_login(users[role])
+
+    response = client.get("/tickets/reports/export.csv")
+
+    assert response.status_code == 200
+    assert response["Content-Type"] == "text/csv"
+    rows = list(csv.reader(StringIO(response.content.decode())))
+    assert rows[0] == [
+        "ID",
+        "Title",
+        "Category",
+        "Priority",
+        "Status",
+        "Requester",
+        "Assignee",
+        "Created",
+        "Resolved",
+        "Overdue",
+    ]
+    assert rows[1][:7] == [
+        str(ticket.pk),
+        "CSV export ticket",
+        "Hardware",
+        "critical",
+        "open",
+        "employee@example.com",
+        "technician@example.com",
+    ]
+    assert rows[1][8:] == ["", "False"]
+
+
+def test_technician_can_see_and_edit_another_employees_ticket(users, category):
+    ticket = Ticket.objects.create(
+        title="Staff access ticket",
+        description="Visible to staff",
+        category=category,
+        requester=users["employee"],
+    )
+    client = APIClient()
+    client.force_authenticate(users["technician"])
+
+    listing = client.get("/api/tickets/")
+    update = client.patch(
+        f"/api/tickets/{ticket.pk}/",
+        {"title": "Updated by technician"},
+        format="json",
+    )
+
+    assert listing.status_code == 200
+    assert listing.data["count"] == 1
+    assert update.status_code == 200
+    ticket.refresh_from_db()
+    assert ticket.title == "Updated by technician"
 
 
 def test_status_transitions_enforced(ticket):
