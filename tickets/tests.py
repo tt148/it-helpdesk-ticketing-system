@@ -441,3 +441,156 @@ def test_seed_demo_creates_expected_accounts_and_data(capsys):
     assert User.objects.filter(email__in=demo_accounts).count() == len(demo_accounts)
     assert Ticket.objects.count() == 30
     assert Article.objects.count() == 4
+
+
+def test_ticket_list_filters_by_fields_search_and_dates(client, users, category, ticket):
+    ticket.assignee = users["technician"]
+    ticket.save(update_fields=["assignee"])
+    client.force_login(users["technician"])
+    today = timezone.localdate().isoformat()
+
+    response = client.get(
+        "/tickets/",
+        {
+            "q": "Broken",
+            "status": "open",
+            "priority": "high",
+            "category": str(category.pk),
+            "assignee": str(users["technician"].pk),
+            "start": today,
+            "end": today,
+        },
+    )
+
+    assert response.status_code == 200
+    assert list(response.context["tickets"]) == [ticket]
+
+
+def test_ticket_list_ignores_invalid_date_filters(client, users):
+    client.force_login(users["technician"])
+
+    response = client.get("/tickets/", {"start": "not-a-date", "end": "also-invalid"})
+
+    assert response.status_code == 200
+    assert len(list(response.context["messages"])) == 2
+
+
+def test_ticket_create_view_saves_requester_and_audit(client, users, category):
+    client.force_login(users["employee"])
+
+    response = client.post(
+        "/tickets/new/",
+        {
+            "title": "Created from the web",
+            "description": "Use the web form",
+            "category": category.pk,
+            "priority": "medium",
+        },
+    )
+
+    assert response.status_code == 302
+    ticket = Ticket.objects.get(title="Created from the web")
+    assert ticket.requester == users["employee"]
+    assert AuditLog.objects.get(ticket=ticket).actor == users["employee"]
+
+
+@override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+def test_staff_comment_sets_first_response_and_notifies_requester(client, users, category, ticket):
+    ticket.assignee = users["technician"]
+    ticket.save(update_fields=["assignee"])
+    client.force_login(users["technician"])
+
+    response = client.post(
+        f"/tickets/{ticket.pk}/",
+        {"body": "We are investigating", "is_internal": ""},
+    )
+
+    assert response.status_code == 302
+    ticket.refresh_from_db()
+    assert ticket.first_response_at is not None
+    assert len(mail.outbox) == 1
+    assert mail.outbox[0].to == [users["employee"].email]
+
+
+def test_ticket_detail_hides_internal_notes_from_employee(client, users, category, ticket):
+    Comment.objects.create(
+        ticket=ticket,
+        author=users["technician"],
+        body="Private staff note",
+        is_internal=True,
+    )
+    client.force_login(users["employee"])
+
+    response = client.get(f"/tickets/{ticket.pk}/")
+
+    assert response.status_code == 200
+    assert list(response.context["comments"]) == []
+
+
+def test_ticket_update_view_changes_status_and_assignee(client, users, category, ticket):
+    client.force_login(users["technician"])
+
+    response = client.post(
+        f"/tickets/{ticket.pk}/update/",
+        {
+            "title": ticket.title,
+            "description": ticket.description,
+            "category": category.pk,
+            "priority": ticket.priority,
+            "status": "in_progress",
+            "assignee": users["admin"].pk,
+        },
+    )
+
+    assert response.status_code == 302
+    ticket.refresh_from_db()
+    assert ticket.status == "in_progress"
+    assert ticket.assignee == users["admin"]
+    assert AuditLog.objects.filter(ticket=ticket, actor=users["technician"]).exists()
+
+
+def test_ticket_update_view_rejects_invalid_status_transition(client, users, category, ticket):
+    client.force_login(users["technician"])
+
+    response = client.post(
+        f"/tickets/{ticket.pk}/update/",
+        {
+            "title": ticket.title,
+            "description": ticket.description,
+            "category": category.pk,
+            "priority": ticket.priority,
+            "status": "closed",
+            "assignee": "",
+        },
+    )
+
+    assert response.status_code == 302
+    ticket.refresh_from_db()
+    assert ticket.status == "open"
+
+
+def test_ticket_delete_is_admin_only(client, users, ticket):
+    client.force_login(users["technician"])
+    forbidden = client.post(f"/tickets/{ticket.pk}/delete/")
+    assert forbidden.status_code == 403
+    assert Ticket.objects.filter(pk=ticket.pk).exists()
+
+    client.force_login(users["admin"])
+    deleted = client.post(f"/tickets/{ticket.pk}/delete/")
+    assert deleted.status_code == 302
+    assert not Ticket.objects.filter(pk=ticket.pk).exists()
+
+
+def test_technician_can_create_api_comment(users, ticket):
+    client = APIClient()
+    client.force_authenticate(users["technician"])
+
+    response = client.post(
+        f"/api/tickets/{ticket.pk}/comments/",
+        {"body": "Internal work note", "is_internal": True},
+        format="json",
+    )
+
+    assert response.status_code == 201
+    assert response.data["is_internal"] is True
+    assert Comment.objects.get(pk=response.data["id"]).author == users["technician"]
