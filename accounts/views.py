@@ -9,23 +9,29 @@ User = get_user_model()
 
 
 class UserForm(forms.ModelForm):
-    password = forms.CharField(
-        widget=forms.PasswordInput, required=False, help_text="Required when creating a user."
-    )
+    password = forms.CharField(widget=forms.PasswordInput, help_text="Required when creating a user.")
 
     class Meta:
         model = User
         fields = ["username", "email", "first_name", "last_name", "role", "is_active", "password"]
 
     def save(self, commit=True):
+        original_password = self._original_password
         user = super().save(commit=False)
-        if self.cleaned_data.get("password"):
-            user.set_password(self.cleaned_data["password"])
-        elif not user.pk:
-            user.set_unusable_password()
+        password = self.cleaned_data["password"]
+        if password:
+            user.set_password(password)
+        elif original_password is not None:
+            user.password = original_password
         if commit:
             user.save()
         return user
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._original_password = self.instance.password if self.instance.pk else None
+        if self.instance.pk:
+            self.fields["password"].required = False
 
 
 @login_required
