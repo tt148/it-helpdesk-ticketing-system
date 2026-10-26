@@ -56,7 +56,6 @@ python -m venv .venv
 # Windows PowerShell: .venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 cp .env.example .env
-python manage.py makemigrations accounts tickets kb
 python manage.py migrate
 python manage.py seed_demo
 python manage.py runserver
@@ -84,7 +83,6 @@ Stop with `docker compose down`; retain database data with the named volume. `do
 
 ```bash
 python manage.py check
-python manage.py makemigrations accounts tickets kb
 python manage.py migrate
 ruff check .
 pytest
