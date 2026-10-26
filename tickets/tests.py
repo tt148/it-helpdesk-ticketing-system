@@ -97,7 +97,7 @@ def test_employee_cannot_create_internal_note(users, category, ticket):
     response = client.post(
         f"/api/tickets/{ticket.pk}/comments/", {"body": "secret", "is_internal": True}, format="json"
     )
-    assert response.status_code == 400
+    assert response.status_code == 403
 
 
 def test_token_endpoint_available(users):
