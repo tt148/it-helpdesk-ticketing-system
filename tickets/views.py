@@ -68,8 +68,9 @@ def ticket_detail(request, pk):
         if not ticket.first_response_at and staff(request.user):
             ticket.first_response_at = timezone.now(); ticket.save(update_fields=["first_response_at", "updated_at"])
         audit(ticket, request.user, "comment_added", {"internal": comment.is_internal})
-        recipients = [ticket.requester.email] if comment.is_internal is False else []
-        if comment.author_id != ticket.requester_id: recipients.append(ticket.requester.email)
+        recipients = []
+        if not comment.is_internal and comment.author_id != ticket.requester_id: recipients.append(ticket.requester.email)
+        if comment.author_id == ticket.requester_id and ticket.assignee: recipients.append(ticket.assignee.email)
         notify(f"New comment on {ticket}", comment.body, recipients)
         messages.success(request, "Your comment has been added.")
         return redirect("tickets:detail", pk=pk)
@@ -81,9 +82,9 @@ def ticket_detail(request, pk):
 def ticket_update(request, pk):
     ticket = get_object_or_404(Ticket, pk=pk)
     if not staff(request.user) and ticket.requester_id != request.user.id: raise PermissionDenied
+    old_status, old_assignee = ticket.status, ticket.assignee_id
     form = TechnicianTicketForm(request.POST, instance=ticket) if staff(request.user) else TicketForm(request.POST, instance=ticket)
     if form.is_valid():
-        old_status, old_assignee = ticket.status, ticket.assignee_id
         requested_status = form.cleaned_data.get("status", old_status)
         if requested_status != old_status and requested_status not in Ticket.TRANSITIONS.get(old_status, set()):
             messages.error(request, f"Invalid status transition: {old_status} → {requested_status}.")
