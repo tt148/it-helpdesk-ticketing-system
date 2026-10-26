@@ -19,7 +19,8 @@ jobs:
     env:
       DJANGO_SECRET_KEY: ci-only-secret-key-not-for-production
       DJANGO_DEBUG: "True"
-      USE_SQLITE: "True"
+      DATABASE_URL: postgresql://helpdesk:postgres@localhost:5432/helpdesk
+      USE_SQLITE: "False"
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
