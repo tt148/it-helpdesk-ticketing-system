@@ -4,7 +4,9 @@ from io import StringIO
 
 import pytest
 from django.contrib.auth import get_user_model
+from django.core import mail
 from django.core.exceptions import ValidationError
+from django.test import override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
 
@@ -203,6 +205,74 @@ def test_ticket_creation_status_and_assignment_are_audited(users, category):
     assert assignment_log.actor == users["technician"]
     assert assignment_log.details == {"assignee": {"from": "None", "to": str(users["admin"])}}
     assert AuditLog.objects.filter(ticket=ticket).count() == 3
+
+
+@override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+def test_assignment_sends_one_email_to_assignee(users, category):
+    ticket = Ticket.objects.create(
+        title="Assignment notification",
+        description="Notify the new assignee",
+        category=category,
+        requester=users["employee"],
+    )
+    client = APIClient()
+    client.force_authenticate(users["technician"])
+
+    response = client.patch(
+        f"/api/tickets/{ticket.pk}/",
+        {"assignee": users["admin"].pk},
+        format="json",
+    )
+
+    assert response.status_code == 200
+    assert len(mail.outbox) == 1
+    assert mail.outbox[0].to == [users["admin"].email]
+    assert mail.outbox[0].subject.startswith("Ticket assigned:")
+
+
+@override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+def test_status_change_sends_one_email_to_requester(users, category):
+    ticket = Ticket.objects.create(
+        title="Status notification",
+        description="Notify the requester",
+        category=category,
+        requester=users["employee"],
+    )
+    client = APIClient()
+    client.force_authenticate(users["technician"])
+
+    response = client.patch(
+        f"/api/tickets/{ticket.pk}/",
+        {"status": "in_progress"},
+        format="json",
+    )
+
+    assert response.status_code == 200
+    assert len(mail.outbox) == 1
+    assert mail.outbox[0].to == [users["employee"].email]
+    assert mail.outbox[0].subject.startswith("Ticket status changed:")
+
+
+@override_settings(EMAIL_BACKEND="django.core.mail.backends.locmem.EmailBackend")
+def test_new_requester_comment_sends_one_email_to_assignee(client, users, category):
+    ticket = Ticket.objects.create(
+        title="Comment notification",
+        description="Notify the assigned technician",
+        category=category,
+        requester=users["employee"],
+        assignee=users["technician"],
+    )
+    client.force_login(users["employee"])
+
+    response = client.post(
+        f"/tickets/{ticket.pk}/",
+        {"body": "Additional details for the technician"},
+    )
+
+    assert response.status_code == 302
+    assert len(mail.outbox) == 1
+    assert mail.outbox[0].to == [users["technician"].email]
+    assert mail.outbox[0].subject.startswith("New comment on")
 
 
 def test_status_transitions_enforced(ticket):
