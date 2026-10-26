@@ -1,6 +1,8 @@
 from django.conf import settings
 from django.db import models
 from django.utils.text import slugify
+
+
 class Article(models.Model):
     title = models.CharField(max_length=180)
     slug = models.SlugField(unique=True, blank=True)

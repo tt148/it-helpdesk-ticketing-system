@@ -4,9 +4,13 @@ from django.core.exceptions import PermissionDenied
 from django.db.models import Q
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils.text import slugify
+
 from tickets.models import Ticket
-from .models import Article
+
 from .forms import ArticleForm
+from .models import Article
+
+
 @login_required
 def article_list(request):
     q = request.GET.get("q", "").strip()

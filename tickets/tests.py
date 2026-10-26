@@ -1,10 +1,13 @@
+from datetime import timedelta
+
 import pytest
+from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 from django.utils import timezone
-from datetime import timedelta
 from rest_framework.test import APIClient
-from django.contrib.auth import get_user_model
-from .models import Ticket, Category, Comment
+
+from .models import Category, Comment, Ticket
+
 User = get_user_model()
 
 @pytest.fixture

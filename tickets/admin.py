@@ -1,5 +1,7 @@
 from django.contrib import admin
-from .models import Ticket, Category, Comment, AuditLog
+
+from .models import AuditLog, Category, Comment, Ticket
+
 admin.site.register(Ticket)
 admin.site.register(Category)
 admin.site.register(Comment)

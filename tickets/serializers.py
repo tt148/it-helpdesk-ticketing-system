@@ -1,6 +1,8 @@
 from rest_framework import serializers
-from .models import Ticket, Comment, Category
+
+from .models import Category, Comment, Ticket
 from .services import audit, notify
+
 
 class CategorySerializer(serializers.ModelSerializer):
     class Meta: model = Category; fields = ["id", "name", "slug", "description"]

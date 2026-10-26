@@ -1,9 +1,11 @@
 from django.contrib import admin
-from django.urls import path, include
-from rest_framework.routers import DefaultRouter
+from django.urls import include, path
+from drf_spectacular.views import SpectacularAPIView, SpectacularRedocView, SpectacularSwaggerView
 from rest_framework.authtoken.views import obtain_auth_token
-from drf_spectacular.views import SpectacularAPIView, SpectacularSwaggerView, SpectacularRedocView
-from tickets.views import TicketViewSet, CategoryViewSet
+from rest_framework.routers import DefaultRouter
+
+from tickets.views import CategoryViewSet, TicketViewSet
+
 router = DefaultRouter()
 router.register("tickets", TicketViewSet, basename="api-ticket")
 router.register("categories", CategoryViewSet, basename="api-category")

@@ -1,14 +1,14 @@
-from datetime import timedelta
 from django.contrib.auth.decorators import login_required
-from django.db.models import Avg, Count, F, ExpressionWrapper, DurationField
+from django.db.models import Count
 from django.shortcuts import render
-from django.utils import timezone
+
 from tickets.models import Ticket
 from tickets.views import staff
+
+
 @login_required
 def home(request):
     qs = Ticket.objects.all() if staff(request.user) else Ticket.objects.filter(requester=request.user)
-    now = timezone.now()
     open_count = qs.exclude(status__in=["resolved", "closed"]).count()
     overdue_count = sum(1 for t in qs.select_related("category", "requester", "assignee") if t.is_overdue)
     resolved = qs.filter(resolved_at__isnull=False)

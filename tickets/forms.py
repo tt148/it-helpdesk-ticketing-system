@@ -1,6 +1,8 @@
 from django import forms
 from django.contrib.auth import get_user_model
-from .models import Ticket, Comment, Category
+
+from .models import Category, Comment, Ticket
+
 User = get_user_model()
 class TicketForm(forms.ModelForm):
     class Meta:

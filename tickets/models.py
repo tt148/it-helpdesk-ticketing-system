@@ -1,8 +1,10 @@
 from datetime import timedelta
+
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 from django.utils import timezone
+
 
 class Category(models.Model):
     name = models.CharField(max_length=80, unique=True)

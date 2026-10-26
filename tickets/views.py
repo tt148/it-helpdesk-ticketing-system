@@ -1,24 +1,26 @@
 import csv
-from datetime import datetime, time
+from datetime import datetime
+
 from django.contrib import messages
-from django.contrib.auth.decorators import login_required
 from django.contrib.auth import get_user_model
-from django.core.exceptions import PermissionDenied, ValidationError
+from django.contrib.auth.decorators import login_required
+from django.core.exceptions import PermissionDenied
 from django.db.models import Q
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.utils import timezone
 from django.views.decorators.http import require_POST
-from rest_framework import viewsets, filters
+from rest_framework import filters, viewsets
 from rest_framework.decorators import action
-from rest_framework.exceptions import PermissionDenied as DRFPermissionDenied
 from rest_framework.permissions import IsAuthenticated
 from rest_framework.response import Response
-from .forms import TicketForm, TechnicianTicketForm, CommentForm
-from .models import Ticket, Comment, Category
+
+from .forms import CommentForm, TechnicianTicketForm, TicketForm
+from .models import Category, Ticket
 from .permissions import TicketObjectPermission
-from .serializers import TicketSerializer, CommentSerializer, CategorySerializer
+from .serializers import CategorySerializer, CommentSerializer, TicketSerializer
 from .services import audit, notify
+
 User = get_user_model()
 
 def staff(user): return user.role in {User.Role.TECHNICIAN, User.Role.ADMIN}

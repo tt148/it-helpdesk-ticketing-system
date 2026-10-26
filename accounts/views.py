@@ -1,9 +1,10 @@
+from django import forms
+from django.contrib import messages
 from django.contrib.auth import get_user_model
 from django.contrib.auth.decorators import login_required
 from django.core.exceptions import PermissionDenied
 from django.shortcuts import get_object_or_404, redirect, render
-from django.contrib import messages
-from django import forms
+
 User = get_user_model()
 class UserForm(forms.ModelForm):
     password = forms.CharField(widget=forms.PasswordInput, required=False, help_text="Required when creating a user.")
