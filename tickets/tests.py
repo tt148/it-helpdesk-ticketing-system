@@ -74,10 +74,101 @@ def test_sla_deadline_by_priority(ticket):
     assert ticket.resolution_due_at == ticket.created_at + timedelta(hours=8)
 
 
+@pytest.mark.parametrize(
+    ("priority", "hours"),
+    [("critical", 4), ("high", 8), ("medium", 48), ("low", 72)],
+)
+def test_sla_deadline_for_each_priority(users, category, priority, hours):
+    ticket = Ticket.objects.create(
+        title=f"{priority} ticket",
+        description="SLA check",
+        category=category,
+        requester=users["employee"],
+        priority=priority,
+    )
+
+    assert ticket.resolution_due_at == ticket.created_at + timedelta(hours=hours)
+
+
 def test_overdue_flag(ticket):
     Ticket.objects.filter(pk=ticket.pk).update(created_at=timezone.now() - timedelta(hours=9))
     ticket.refresh_from_db()
     assert ticket.is_overdue is True
+
+
+def test_active_ticket_is_not_overdue_before_deadline(ticket):
+    ticket.created_at = timezone.now()
+    ticket.save(update_fields=["created_at"])
+
+    assert ticket.is_overdue is False
+
+
+@pytest.mark.parametrize("status", ["resolved", "closed"])
+def test_resolved_or_closed_ticket_is_never_overdue(ticket, status):
+    Ticket.objects.filter(pk=ticket.pk).update(
+        created_at=timezone.now() - timedelta(days=10),
+        status=status,
+    )
+    ticket.refresh_from_db()
+
+    assert ticket.is_overdue is False
+
+
+@pytest.mark.parametrize(
+    ("old_status", "new_status"),
+    [
+        ("open", "in_progress"),
+        ("open", "resolved"),
+        ("in_progress", "open"),
+        ("in_progress", "resolved"),
+        ("resolved", "in_progress"),
+        ("resolved", "closed"),
+    ],
+)
+def test_every_allowed_status_transition_succeeds(users, category, old_status, new_status):
+    ticket = Ticket.objects.create(
+        title="Transition check",
+        description="Status transition",
+        category=category,
+        requester=users["employee"],
+        status=old_status,
+    )
+
+    ticket.transition_to(new_status)
+    ticket.refresh_from_db()
+
+    assert ticket.status == new_status
+    if new_status == "resolved":
+        assert ticket.resolved_at is not None
+    elif new_status == "in_progress":
+        assert ticket.resolved_at is None
+
+
+@pytest.mark.parametrize(
+    ("old_status", "new_status"),
+    [
+        ("open", "closed"),
+        ("in_progress", "closed"),
+        ("resolved", "open"),
+        ("closed", "open"),
+        ("closed", "in_progress"),
+        ("closed", "resolved"),
+    ],
+)
+def test_invalid_status_transitions_are_rejected(users, category, old_status, new_status):
+    ticket = Ticket.objects.create(
+        title="Invalid transition check",
+        description="Status transition",
+        category=category,
+        requester=users["employee"],
+        status=old_status,
+    )
+
+    with pytest.raises(ValidationError):
+        ticket.transition_to(new_status)
+
+    ticket.refresh_from_db()
+    assert ticket.status == old_status
 
 
 def test_internal_notes_hidden_from_employee_api(users, category, ticket):
