@@ -6,9 +6,12 @@ import pytest
 from django.contrib.auth import get_user_model
 from django.core import mail
 from django.core.exceptions import ValidationError
+from django.core.management import call_command
 from django.test import override_settings
 from django.utils import timezone
 from rest_framework.test import APIClient
+
+from kb.models import Article
 
 from .models import AuditLog, Category, Comment, Ticket
 
@@ -410,3 +413,31 @@ def test_token_endpoint_available(users):
     response = client.post("/api/token/", {"username": users["employee"].email, "password": "GoodPass123!"})
     assert response.status_code == 200
     assert "token" in response.data
+
+
+@pytest.mark.django_db
+def test_seed_demo_creates_expected_accounts_and_data(capsys):
+    demo_accounts = {
+        "admin@demo.com": "admin",
+        "tech@demo.com": "technician",
+        "tech2@demo.com": "technician",
+        "employee@demo.com": "employee",
+        "employee2@demo.com": "employee",
+        "employee3@demo.com": "employee",
+    }
+
+    call_command("seed_demo")
+
+    users = User.objects.filter(email__in=demo_accounts)
+    assert users.count() == len(demo_accounts)
+    assert {user.email: user.role for user in users} == demo_accounts
+    assert all(user.check_password("DemoPass123!") for user in users)
+    assert Ticket.objects.count() == 30
+    assert Article.objects.count() == 4
+    assert "Demo data ready." in capsys.readouterr().out
+
+    call_command("seed_demo")
+
+    assert User.objects.filter(email__in=demo_accounts).count() == len(demo_accounts)
+    assert Ticket.objects.count() == 30
+    assert Article.objects.count() == 4
