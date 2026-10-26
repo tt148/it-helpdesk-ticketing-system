@@ -8,7 +8,7 @@ from django.core.exceptions import ValidationError
 from django.utils import timezone
 from rest_framework.test import APIClient
 
-from .models import Category, Comment, Ticket
+from .models import AuditLog, Category, Comment, Ticket
 
 User = get_user_model()
 
@@ -160,6 +160,49 @@ def test_technician_can_see_and_edit_another_employees_ticket(users, category):
     assert update.status_code == 200
     ticket.refresh_from_db()
     assert ticket.title == "Updated by technician"
+
+
+def test_ticket_creation_status_and_assignment_are_audited(users, category):
+    client = APIClient()
+    client.force_authenticate(users["employee"])
+
+    created = client.post(
+        "/api/tickets/",
+        {
+            "title": "Audited ticket",
+            "description": "Check the audit trail",
+            "category": category.pk,
+            "priority": "high",
+        },
+        format="json",
+    )
+    assert created.status_code == 201
+    ticket = Ticket.objects.get(pk=created.data["id"])
+    creation_log = AuditLog.objects.get(ticket=ticket, action="created")
+    assert creation_log.actor == users["employee"]
+    assert creation_log.details == {"status": "open"}
+
+    client.force_authenticate(users["technician"])
+    status_response = client.patch(
+        f"/api/tickets/{ticket.pk}/",
+        {"status": "in_progress"},
+        format="json",
+    )
+    assert status_response.status_code == 200
+    status_log = AuditLog.objects.get(ticket=ticket, action="updated")
+    assert status_log.actor == users["technician"]
+    assert status_log.details == {"status": {"from": "open", "to": "in_progress"}}
+
+    assignment_response = client.patch(
+        f"/api/tickets/{ticket.pk}/",
+        {"assignee": users["admin"].pk},
+        format="json",
+    )
+    assert assignment_response.status_code == 200
+    assignment_log = AuditLog.objects.filter(ticket=ticket, action="updated").latest("created_at")
+    assert assignment_log.actor == users["technician"]
+    assert assignment_log.details == {"assignee": {"from": "None", "to": str(users["admin"])}}
+    assert AuditLog.objects.filter(ticket=ticket).count() == 3
 
 
 def test_status_transitions_enforced(ticket):
