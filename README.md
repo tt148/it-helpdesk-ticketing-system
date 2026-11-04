@@ -35,14 +35,6 @@ Python 3.12 · Django 5.x · Django REST Framework · PostgreSQL · SQLite · Bo
 
 Core relationships: each ticket has a requester and optional assignee, belongs to a category, and has many comments and audit records. A knowledge article may be linked to a resolved source ticket.
 
-## Screenshots
-
-Add real screenshots after running the app. Suggested images:
-
-- `docs/screenshots/dashboard.png` — dashboard overview
-- `docs/screenshots/ticket-list.png` — filters and SLA flags
-- `docs/screenshots/ticket-detail.png` — conversation and audit timeline
-- `docs/screenshots/knowledge-base.png` — searchable articles
 
 ## Run locally (SQLite)
 
